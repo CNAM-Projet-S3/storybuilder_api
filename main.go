@@ -19,6 +19,7 @@ func main() {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/here", api.HereEndpoint).Methods("POST")
+	r.HandleFunc("/spotify", api.SpotifyEndpoint).Methods("POST")
 
 	srv := &http.Server{
 		Handler:      r,
