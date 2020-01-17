@@ -4,54 +4,58 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/CNAM-Projet-S3/api_storybuilder/services"
 	"github.com/zmb3/spotify"
-)
-
-var (
-	auth  spotify.Authenticator
-	state = "toto123"
 )
 
 func IsValidClientID(clientID string) bool {
 	return clientID == os.Getenv("API_CLIENT_ID")
 }
 
-func LoginSpotify(w http.ResponseWriter, r *http.Request) {
-	acTk := os.Getenv("SPOTIFY_ACCESS_TOKEN")
-	rfTk := os.Getenv("SPOTIFY_REFRESH_TOKEN")
+func LoginSpotify(prv *services.Provider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := services.TokenFromFile(); err == nil {
+			w.Write([]byte("Spotify is already connected"))
+			return
+		}
 
-	if len(acTk) == 0 || len(rfTk) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("The server is already authentificated"))
-		return
+		http.Redirect(w, r, prv.Auth.AuthURL(prv.State), 200)
 	}
-
-	auth = spotify.NewAuthenticator(os.Getenv("HOST")+"/spotify/callback", spotify.ScopeUserReadPrivate)
-	auth.SetAuthInfo(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_KEY"))
-
-	http.Redirect(w, r, auth.AuthURL(state), 200)
 }
 
-func CompleteSpotifyAuth(w http.ResponseWriter, r *http.Request) {
-	acTk := os.Getenv("SPOTIFY_ACCESS_TOKEN")
-	rfTk := os.Getenv("SPOTIFY_REFRESH_TOKEN")
+func CompleteSpotifyAuth(prv *services.Provider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, err := services.TokenFromFile(); err == nil {
+			w.Write([]byte("Spotify is already connected"))
+			return
+		}
 
-	if len(acTk) == 0 || len(rfTk) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("The server is already authentificated"))
-		return
+		token, err := prv.Auth.Token(prv.State, r)
+		if err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		if st := r.FormValue("state"); st != prv.State {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		client := spotify.Authenticator{}.NewClient(token)
+		tok, err := client.Token()
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		err = services.TokenToFile(tok)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		w.Write([]byte("You can close this window"))
+
 	}
-
-	tok, err := auth.Token(state, r)
-	if err != nil {
-		w.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	if st := r.FormValue("state"); st != state {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	w.Write([]byte("Please store the token in the environment file: AccessToken = " + tok.AccessToken + " / RefreshToken = " + tok.RefreshToken))
 }

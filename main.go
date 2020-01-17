@@ -6,9 +6,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/CNAM-Projet-S3/api_storybuilder/api"
+	"github.com/CNAM-Projet-S3/api_storybuilder/services"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"github.com/oxodao/api_storybuilder/api"
+	"github.com/zmb3/spotify"
 )
 
 func main() {
@@ -17,12 +19,19 @@ func main() {
 		panic(err)
 	}
 
+	provider := services.Provider{
+		Auth:  spotify.NewAuthenticator(os.Getenv("HOST")+"/spotify/callback", spotify.ScopeUserReadPrivate),
+		State: "toto123",
+	}
+
+	provider.Auth.SetAuthInfo(os.Getenv("SPOTIFY_CLIENT_ID"), os.Getenv("SPOTIFY_CLIENT_KEY"))
+
 	r := mux.NewRouter()
 
-	r.HandleFunc("/here", api.HereEndpoint).Methods("POST")
-	r.HandleFunc("/spotify", api.SpotifyEndpoint).Methods("POST")
-	r.HandleFunc("/spotify/login", api.LoginSpotify)
-	r.HandleFunc("/spotify/callback", api.CompleteSpotifyAuth)
+	r.HandleFunc("/here", api.HereEndpoint(&provider)).Methods("POST")
+	r.HandleFunc("/spotify", api.SpotifyEndpoint(&provider)).Methods("POST")
+	r.HandleFunc("/spotify/login", api.LoginSpotify(&provider))
+	r.HandleFunc("/spotify/callback", api.CompleteSpotifyAuth(&provider))
 
 	srv := &http.Server{
 		Handler:      r,
