@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -20,14 +21,15 @@ func main() {
 
 	r.HandleFunc("/here", api.HereEndpoint).Methods("POST")
 	r.HandleFunc("/spotify", api.SpotifyEndpoint).Methods("POST")
+	r.HandleFunc("/spotify/login", api.LoginSpotify)
+	r.HandleFunc("/spotify/callback", api.CompleteSpotifyAuth)
 
 	srv := &http.Server{
 		Handler:      r,
-		Addr:         "127.0.0.1:1242",
+		Addr:         "127.0.0.1:" + os.Getenv("API_PORT"),
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
 
 	log.Fatal(srv.ListenAndServe())
-
 }
